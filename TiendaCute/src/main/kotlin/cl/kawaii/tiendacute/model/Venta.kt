@@ -24,6 +24,14 @@ class Venta(
     @Column(name = "total", nullable = false, precision = 10, scale = 2)
     var total: BigDecimal = BigDecimal.ZERO,
 
+    /**
+     * Monto ya pagado por esta venta a través de pagos registrados. Se
+     * actualiza en la misma transacción que cada pago, para que el saldo
+     * pendiente sea consistente sin consultas adicionales.
+     */
+    @Column(name = "monto_pagado", nullable = false, precision = 10, scale = 2)
+    var montoPagado: BigDecimal = BigDecimal.ZERO,
+
     @Column(name = "tipo_documento", nullable = false, length = 20)
     var tipoDocumento: String = "",
 
@@ -40,4 +48,8 @@ class Venta(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id", nullable = true)
     var cliente: Cliente? = null
-)
+) {
+
+    /** Saldo aún por cobrar: total menos lo ya pagado. */
+    fun saldoPendiente(): BigDecimal = total.subtract(montoPagado)
+}

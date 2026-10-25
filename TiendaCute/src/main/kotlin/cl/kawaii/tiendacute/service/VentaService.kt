@@ -12,6 +12,7 @@ import cl.kawaii.tiendacute.repository.MovimientoStockRepository
 import cl.kawaii.tiendacute.repository.ProductoRepository
 import cl.kawaii.tiendacute.repository.UsuarioRepository
 import cl.kawaii.tiendacute.repository.VentaRepository
+import cl.kawaii.tiendacute.service.CajaService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -24,7 +25,8 @@ class VentaService(
     private val productoRepository: ProductoRepository,
     private val movimientoStockRepository: MovimientoStockRepository,
     private val usuarioRepository: UsuarioRepository,
-    private val clienteRepository: ClienteRepository
+    private val clienteRepository: ClienteRepository,
+    private val cajaService: CajaService
 ) {
 
     fun listarVentas(): List<Venta> = ventaRepository.findAll()
@@ -129,6 +131,15 @@ class VentaService(
             detalle.venta = ventaGuardada
             detalleVentaRepository.save(detalle)
         }
+
+        // Movimiento de caja automático si hay caja abierta.
+        cajaService.registrarIngresoCaja(
+            monto = ventaGuardada.total,
+            concepto = "Venta #${ventaGuardada.idVenta}",
+            referenciaTipo = "VENTA",
+            referenciaId = ventaGuardada.idVenta,
+            usuarioId = usuario.idUsuario
+        )
 
         return ventaGuardada
     }

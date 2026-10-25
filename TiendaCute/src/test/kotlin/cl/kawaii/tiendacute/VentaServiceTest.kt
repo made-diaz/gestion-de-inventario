@@ -6,9 +6,12 @@ import cl.kawaii.tiendacute.dto.VentaRequest
 import cl.kawaii.tiendacute.exception.RecursoNoEncontradoException
 import cl.kawaii.tiendacute.exception.ReglaNegocioException
 import cl.kawaii.tiendacute.model.Categoria
+import cl.kawaii.tiendacute.model.Caja
 import cl.kawaii.tiendacute.model.Producto
 import cl.kawaii.tiendacute.model.Usuario
 import cl.kawaii.tiendacute.repository.CategoriaRepository
+import cl.kawaii.tiendacute.repository.CajaRepository
+import cl.kawaii.tiendacute.repository.MovimientoCajaRepository
 import cl.kawaii.tiendacute.repository.MovimientoStockRepository
 import cl.kawaii.tiendacute.repository.ProductoRepository
 import cl.kawaii.tiendacute.repository.UsuarioRepository
@@ -17,12 +20,14 @@ import cl.kawaii.tiendacute.service.VentaService
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 @SpringBootTest
+@Transactional
 class VentaServiceTest {
 
     @Autowired
@@ -42,6 +47,12 @@ class VentaServiceTest {
 
     @Autowired
     private lateinit var movimientoStockRepository: MovimientoStockRepository
+
+    @Autowired
+    private lateinit var cajaRepository: CajaRepository
+
+    @Autowired
+    private lateinit var movimientoCajaRepository: MovimientoCajaRepository
 
     @Test
     fun `registrar venta descuenta stock, calcula totales y deja movimiento de salida`() {
@@ -128,8 +139,7 @@ class VentaServiceTest {
     }
 
     @Test
-    fun `registrar venta rechaza un usuario inexistente`() {
-        val producto = crearProducto("SKU-SIN-USUARIO", stock = 5, precioVenta = "100.00")
+    fun `registrar venta rechaza un usuario inexistente`() {        val producto = crearProducto("SKU-SIN-USUARIO", stock = 5, precioVenta = "100.00")
 
         assertFailsWith<RecursoNoEncontradoException> {
             ventaService.registrarVenta(
@@ -146,6 +156,29 @@ class VentaServiceTest {
         usuarioRepository.save(
             Usuario(usuario = nombre, password = "secreto", rolUsuario = "VENDEDOR")
         )
+
+    @Test
+    fun `registrar venta deja movimiento de caja cuando hay caja abierta`() {
+        val usuario = crearUsuario("venta-caja")
+        val producto = crearProducto("SKU-CAJA", stock = 10, precioVenta = "1000.00")
+        cajaRepository.save(
+            Caja(montoInicial = BigDecimal("10000.00"), estado = "ABIERTA", usuario = usuario)
+        )
+
+        val venta = ventaService.registrarVenta(
+            VentaRequest(
+                venta = DatosVenta(tipoDocumento = "BOLETA"),
+                detalles = listOf(DetalleVentaRequest(productoId = producto.idProducto, cantidad = 3)),
+                usuarioId = usuario.idUsuario
+            )
+        )
+
+        val movimientos = movimientoCajaRepository.findAll()
+        assertEquals(1, movimientos.size)
+        assertEquals(venta.total, movimientos.single().monto)
+        assertEquals("VENTA", movimientos.single().referenciaTipo)
+        assertEquals(BigDecimal("3570.00"), venta.total)
+    }
 
     private fun crearProducto(codigo: String, stock: Int, precioVenta: String): Producto {
         val categoria = categoriaRepository.save(Categoria(nombreCategoria = "Categoría $codigo"))

@@ -49,6 +49,8 @@ class SecurityConfig(
                 // Operación de mostrador: vender, cobrar y registrar clientes.
                 it.requestMatchers(HttpMethod.POST, "/api/ventas").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
                 it.requestMatchers(HttpMethod.POST, "/api/pagos").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
+                it.requestMatchers(HttpMethod.POST, "/api/cajas/**").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
+                it.requestMatchers(HttpMethod.POST, "/api/documentos-tributarios/emitir").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
                 it.requestMatchers(HttpMethod.POST, "/api/clientes").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
 
                 // Administración: usuarios y todo lo que modifica el catálogo.
