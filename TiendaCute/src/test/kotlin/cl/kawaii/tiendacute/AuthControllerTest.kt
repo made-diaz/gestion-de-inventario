@@ -34,23 +34,13 @@ class AuthControllerTest {
 
     @BeforeEach
     fun prepararUsuarios() {
-        listOf("auth-test", "auth-inactivo").forEach { nombre ->
-            usuarioRepository.findByUsuario(nombre).ifPresent { usuarioRepository.delete(it) }
-        }
+        usuarioRepository.findByUsuario("auth-test").ifPresent { usuarioRepository.delete(it) }
 
         usuarioRepository.save(
             Usuario(
                 usuario = "auth-test",
                 password = passwordEncoder.encode("clave-correcta"),
                 rolUsuario = "ADMIN"
-            )
-        )
-        usuarioRepository.save(
-            Usuario(
-                usuario = "auth-inactivo",
-                password = passwordEncoder.encode("clave-correcta"),
-                rolUsuario = "VENDEDOR",
-                activoUsuario = false
             )
         )
     }
@@ -88,17 +78,6 @@ class AuthControllerTest {
         }.andExpect {
             status { isUnauthorized() }
             jsonPath("$.estado") { value(401) }
-        }
-    }
-
-    @Test
-    fun `login de usuario inactivo devuelve 403`() {
-        mockMvc.post("/api/auth/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"usuario":"auth-inactivo","password":"clave-correcta"}"""
-        }.andExpect {
-            status { isForbidden() }
-            jsonPath("$.estado") { value(403) }
         }
     }
 

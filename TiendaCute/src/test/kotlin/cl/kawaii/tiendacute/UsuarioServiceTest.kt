@@ -1,4 +1,4 @@
-package cl.kawaii.tiendacute
+﻿package cl.kawaii.tiendacute
 
 import cl.kawaii.tiendacute.model.Usuario
 import cl.kawaii.tiendacute.repository.UsuarioRepository
@@ -25,23 +25,23 @@ class UsuarioServiceTest {
     @Test
     fun `guardar usuario almacena la contrasena hasheada`() {
         val guardado = usuarioService.guardarUsuario(
-            Usuario(usuario = "hash-test", password = "secreto-plano", rolUsuario = "ADMIN")
+            Usuario(usuario = "hash-test", password = "secreto-plano1", rolUsuario = "ADMIN")
         )
 
         val enBase = usuarioRepository.findById(guardado.idUsuario).orElseThrow()
 
         assertFalse(enBase.password == "secreto-plano", "La contraseña no debe guardarse en texto plano")
-        assertTrue(passwordEncoder.matches("secreto-plano", enBase.password))
+        assertTrue(passwordEncoder.matches("secreto-plano1", enBase.password))
     }
 
     @Test
     fun `guardar usuario ignora el id enviado por el cliente`() {
         val existente = usuarioService.guardarUsuario(
-            Usuario(usuario = "id-existente", password = "secreto", rolUsuario = "ADMIN")
+            Usuario(usuario = "id-existente", password = "secreto123", rolUsuario = "ADMIN")
         )
 
         val nuevo = usuarioService.guardarUsuario(
-            Usuario(idUsuario = existente.idUsuario, usuario = "id-nuevo", password = "secreto", rolUsuario = "ADMIN")
+            Usuario(idUsuario = existente.idUsuario, usuario = "id-nuevo", password = "secreto123", rolUsuario = "ADMIN")
         )
 
         assertFalse(nuevo.idUsuario == existente.idUsuario, "No debe sobrescribir al usuario existente")

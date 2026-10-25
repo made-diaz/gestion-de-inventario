@@ -6,7 +6,7 @@ Rama: `feat/jwt-auth`. Runner: `.\gradlew.bat test`.
 ## Specs
 
 - **S1.** `POST /api/auth/login` recibe `{ "usuario": "...", "password": "..." }` y devuelve `200` con `{ token, tipo, expiraEnSegundos, usuario, rol }` cuando las credenciales son válidas.
-- **S2.** Credenciales inválidas devuelven `401` con `{ estado, mensaje }`. Usuario con `activoUsuario = false` devuelve `403`.
+- **S2.** Credenciales inválidas devuelven `401` con `{ estado, mensaje }`. Un usuario con `activoUsuario = false` devuelve la respuesta exacta de una contraseña incorrecta, sin revelar que la cuenta existe.
 - **S3.** Todo `/api/**` excepto `/api/auth/login` exige `Authorization: Bearer <token>`. Sin token, token inválido o expirado devuelve `401` con cuerpo JSON.
 - **S4.** El token es un JWT HS256 firmado con `app.jwt.secret`, con `subject` = nombre de usuario, claim `rol` y expiración `app.jwt.expiracion-minutos` (default 120). Un secreto de menos de 32 caracteres impide el arranque con mensaje claro.
 - **S5.** `usuario` y `password` vacíos devuelven `400` (usa `spring-boot-starter-validation`, que estaba sin usar).
@@ -30,3 +30,4 @@ Rama: `feat/jwt-auth`. Runner: `.\gradlew.bat test`.
 - **L2.** Decisión: sesiones stateless, sin refresh token por ahora. El token vive 2 horas y se vuelve a pedir con login.
 - **L3.** Detección durante la implementación: al exigir token en todos los endpoints, una base vacía quedaba inutilizable (no había forma de crear el primer usuario). Se agregó el usuario inicial por variables de entorno.
 - **L4.** Verificación independiente sobre `b6d905d` encontró que un token seguía siendo válido después de deshabilitar la cuenta (hasta 2 horas), un `NullPointerException` con tokens sin claim `exp`, y placeholders del `.example` que parecían secretos reales. Se corrigió todo y se agregaron 5 tests de rechazo (`JwtRechazoTest`).
+- **L5.** Cambio de requisito durante `endurecer-auth`: el login de una cuenta deshabilitada deja de responder `403` y pasa a `401` idéntico al de una contraseña incorrecta, para no filtrar qué usuarios existen. S2 se reescribió y el test correspondiente se movió a `SeguridadAutenticacionTest`, que compara los dos cuerpos byte a byte.

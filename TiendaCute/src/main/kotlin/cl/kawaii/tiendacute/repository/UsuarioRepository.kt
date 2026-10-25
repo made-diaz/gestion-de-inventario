@@ -8,4 +8,6 @@ import java.util.Optional
 @Repository
 interface UsuarioRepository : JpaRepository <Usuario, Long>{
     fun findByUsuario(usuario: String): Optional<Usuario>
+
+    fun countByRolUsuarioAndActivoUsuario(rolUsuario: String, activoUsuario: Boolean): Long
 }

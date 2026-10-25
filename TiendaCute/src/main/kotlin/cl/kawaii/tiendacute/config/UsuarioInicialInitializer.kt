@@ -1,7 +1,9 @@
 package cl.kawaii.tiendacute.config
 
 import cl.kawaii.tiendacute.model.Usuario
+import cl.kawaii.tiendacute.exception.ReglaNegocioException
 import cl.kawaii.tiendacute.repository.UsuarioRepository
+import cl.kawaii.tiendacute.service.UsuarioService
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
@@ -35,6 +37,16 @@ class UsuarioInicialInitializer(
             log.warn(
                 "No hay usuarios en la base y app.admin.password está vacío. " +
                     "Definí ADMIN_PASSWORD en env.properties para crear el usuario inicial."
+            )
+            return
+        }
+
+        try {
+            UsuarioService.validarPassword(adminUsuario, adminPassword)
+        } catch (e: ReglaNegocioException) {
+            log.warn(
+                "No se creó el usuario inicial: {}. Corregí ADMIN_PASSWORD en env.properties.",
+                e.message
             )
             return
         }

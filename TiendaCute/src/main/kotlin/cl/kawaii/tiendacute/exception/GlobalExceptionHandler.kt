@@ -1,11 +1,11 @@
 package cl.kawaii.tiendacute.exception
 
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.security.authentication.BadCredentialsException
-import org.springframework.security.authentication.DisabledException
 import org.springframework.security.core.AuthenticationException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -31,15 +31,17 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException::class)
     fun manejarCredencialesInvalidas(ex: BadCredentialsException): ResponseEntity<ErrorResponse> =
-        construir(HttpStatus.UNAUTHORIZED, "Usuario o contraseña incorrectos")
-
-    @ExceptionHandler(DisabledException::class)
-    fun manejarUsuarioDeshabilitado(ex: DisabledException): ResponseEntity<ErrorResponse> =
-        construir(HttpStatus.FORBIDDEN, "El usuario está deshabilitado")
+        construir(HttpStatus.UNAUTHORIZED, MENSAJE_CREDENCIALES)
 
     @ExceptionHandler(AuthenticationException::class)
     fun manejarAutenticacion(ex: AuthenticationException): ResponseEntity<ErrorResponse> =
-        construir(HttpStatus.UNAUTHORIZED, "No se pudo autenticar la solicitud")
+        construir(HttpStatus.UNAUTHORIZED, MENSAJE_CREDENCIALES)
+
+    @ExceptionHandler(DemasiadosIntentosException::class)
+    fun manejarDemasiadosIntentos(ex: DemasiadosIntentosException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(HttpHeaders.RETRY_AFTER, ex.reintentarEnSegundos.toString())
+            .body(ErrorResponse(HttpStatus.TOO_MANY_REQUESTS.value(), ex.message ?: "Demasiados intentos"))
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun manejarValidacion(ex: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
@@ -67,4 +69,10 @@ class GlobalExceptionHandler {
 
     private fun construir(estado: HttpStatus, mensaje: String?): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(estado).body(ErrorResponse(estado.value(), mensaje ?: estado.reasonPhrase))
+
+    private companion object {
+        // Un mismo mensaje para usuario inexistente, contraseña incorrecta y
+        // cuenta deshabilitada: no se le confirma al atacante qué falló.
+        const val MENSAJE_CREDENCIALES = "Usuario o contraseña incorrectos"
+    }
 }
