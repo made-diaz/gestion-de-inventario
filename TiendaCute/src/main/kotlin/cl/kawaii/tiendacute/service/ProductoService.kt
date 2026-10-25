@@ -2,14 +2,22 @@ package cl.kawaii.tiendacute.service
 
 import cl.kawaii.tiendacute.dto.ProductoActualizarRequest
 import cl.kawaii.tiendacute.exception.RecursoNoEncontradoException
+import cl.kawaii.tiendacute.model.Categoria
 import cl.kawaii.tiendacute.model.MovimientoStock
 import cl.kawaii.tiendacute.model.Producto
 import cl.kawaii.tiendacute.model.Usuario
 import cl.kawaii.tiendacute.repository.MovimientoStockRepository
 import cl.kawaii.tiendacute.repository.ProductoRepository
 import cl.kawaii.tiendacute.repository.UsuarioRepository
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.criteria.CriteriaBuilder
+import jakarta.persistence.criteria.CriteriaQuery
+import jakarta.persistence.criteria.Predicate
+import jakarta.persistence.criteria.Root
 import java.math.BigDecimal
 
 @Service
@@ -19,8 +27,42 @@ class ProductoService(
     private val usuarioRepository: UsuarioRepository
 ) {
 
+    /**
+     * Lista productos con paginación y filtros opcionales.
+     *
+     * Cuando se pasan `page` y `size`, se aplica paginación en BD y el total
+     * se expone en el header `X-Total-Count` desde el controller.
+     * El cuerpo sigue siendo un ARRAY para no romper contratos existentes.
+     *
+     * Filtros:
+     *   - q: busca en nombre y código (case insensitive)
+     *   - idCategoria: filtra por categoría exacta
+     */
     @Transactional(readOnly = true)
-    fun listarProductos(): List<Producto> = productoRepository.findAll()
+    fun listarProductos(
+        pageable: Pageable?,
+        q: String?,
+        idCategoria: Long?
+    ): Page<Producto> {
+        val spec: Specification<Producto> = Specification { root: Root<Producto>, query: CriteriaQuery<*>, cb: CriteriaBuilder ->
+            val predicates = mutableListOf<Predicate>()
+            if (q != null && q.isNotEmpty()) {
+                val like = "%${q.lowercase()}%"
+                predicates.add(cb.or(
+                    cb.like(cb.lower(root.get<String>("nombreProducto")), like),
+                    cb.like(cb.lower(root.get<String>("codigoProducto")), like)
+                ))
+            }
+            if (idCategoria != null) {
+                predicates.add(cb.equal(
+                    root.get<Categoria>("categoria").get<Long>("idCategoria"),
+                    idCategoria
+                ))
+            }
+            cb.and(*predicates.toTypedArray())
+        }
+        return productoRepository.findAll(spec, pageable ?: Pageable.unpaged())
+    }
 
     @Transactional(readOnly = true)
     fun buscarPorId(id: Long): Producto = productoRepository.findById(id)

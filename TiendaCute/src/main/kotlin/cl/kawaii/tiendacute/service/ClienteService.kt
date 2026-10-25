@@ -6,14 +6,40 @@ import cl.kawaii.tiendacute.exception.ReglaNegocioException
 import cl.kawaii.tiendacute.model.Cliente
 import cl.kawaii.tiendacute.repository.ClienteRepository
 import cl.kawaii.tiendacute.util.RutUtil
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.criteria.CriteriaBuilder
+import jakarta.persistence.criteria.CriteriaQuery
+import jakarta.persistence.criteria.Predicate
+import jakarta.persistence.criteria.Root
 
 @Service
 class ClienteService(private val clienteRepository: ClienteRepository) {
 
+    /**
+     * Lista clientes con paginación y filtro opcional `q` por nombre o RUT.
+     */
     @Transactional(readOnly = true)
-    fun listarClientes(): List<Cliente> = clienteRepository.findAll()
+    fun listarClientes(
+        pageable: Pageable?,
+        q: String?
+    ): Page<Cliente> {
+        val spec: Specification<Cliente> = Specification { root: Root<Cliente>, query: CriteriaQuery<*>, cb: CriteriaBuilder ->
+            val predicates = mutableListOf<Predicate>()
+            if (q != null && q.isNotEmpty()) {
+                val like = "%${q.lowercase()}%"
+                predicates.add(cb.or(
+                    cb.like(cb.lower(root.get<String>("nombre")), like),
+                    cb.like(cb.lower(root.get<String>("rutCliente")), like)
+                ))
+            }
+            cb.and(*predicates.toTypedArray())
+        }
+        return clienteRepository.findAll(spec, pageable ?: Pageable.unpaged())
+    }
 
     @Transactional(readOnly = true)
     fun buscarPorId(id: Long): Cliente = clienteRepository.findById(id)

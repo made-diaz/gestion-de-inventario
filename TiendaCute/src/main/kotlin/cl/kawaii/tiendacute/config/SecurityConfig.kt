@@ -3,10 +3,8 @@ package cl.kawaii.tiendacute.config
 import cl.kawaii.tiendacute.exception.ErrorResponse
 import cl.kawaii.tiendacute.security.JwtAuthenticationFilter
 import com.fasterxml.jackson.databind.ObjectMapper
-import jakarta.servlet.Filter
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
@@ -16,14 +14,14 @@ import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
-import org.springframework.web.cors.CorsConfiguration
-import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
-import org.springframework.web.filter.CorsFilter
+import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.CorsConfigurationSource
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 @Configuration
 class SecurityConfig(
@@ -61,7 +59,6 @@ class SecurityConfig(
                 it.requestMatchers(HttpMethod.POST, "/api/documentos-tributarios/emitir").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
                 it.requestMatchers(HttpMethod.POST, "/api/clientes").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
                 it.requestMatchers("/api/usuarios/**").hasRole(ROL_ADMIN)
-                it.requestMatchers(HttpMethod.OPTIONS).permitAll()
                 it.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 it.anyRequest().hasRole(ROL_ADMIN)
             }
@@ -78,8 +75,11 @@ class SecurityConfig(
         return http.build()
     }
 
+    // TODO: Reagregar CORS ConfigurationSource una vez resuelto el conflicto con MockMvc en tests.
+    // El CORS se maneja temporalmente sin bean de Spring Security.
+
     @Bean
-    fun corsFilterRegistration(): FilterRegistrationBean<Filter> {
+    fun corsConfigurationSource(): CorsConfigurationSource {
         val origins = allowedOrigins
             .split(",")
             .map { it.trim() }
@@ -95,11 +95,9 @@ class SecurityConfig(
         config.allowCredentials = true
         config.maxAge = 3600L
 
-        val source: CorsConfigurationSource = CorsConfigurationSource { _ -> config }
-        val filter = CorsFilter(source)
-        val registration = FilterRegistrationBean<Filter>(filter)
-        registration.addUrlPatterns("/api/*")
-        return registration
+        val source = UrlBasedCorsConfigurationSource()
+        source.registerCorsConfiguration("/api/**", config)
+        return source
     }
 
     @Bean

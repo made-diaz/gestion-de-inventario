@@ -4,14 +4,21 @@ import cl.kawaii.tiendacute.dto.CategoriaActualizarRequest
 import cl.kawaii.tiendacute.exception.RecursoNoEncontradoException
 import cl.kawaii.tiendacute.model.Categoria
 import cl.kawaii.tiendacute.repository.CategoriaRepository
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class CategoriaService(private val categoriaRepository: CategoriaRepository) {
 
+    /**
+     * Lista categorías con paginación opcional.
+     */
     @Transactional(readOnly = true)
-    fun listarCategorias(): List<Categoria> = categoriaRepository.findAll()
+    fun listarCategorias(pageable: Pageable?): Page<Categoria> {
+        return categoriaRepository.findAll(pageable ?: Pageable.unpaged())
+    }
 
     @Transactional(readOnly = true)
     fun buscarPorId(id: Long): Categoria = categoriaRepository.findById(id)
@@ -19,7 +26,6 @@ class CategoriaService(private val categoriaRepository: CategoriaRepository) {
 
     @Transactional
     fun guardarCategoria(categoria: Categoria): Categoria {
-        // Es un alta: se ignora cualquier id enviado por el cliente.
         categoria.idCategoria = 0
         return categoriaRepository.save(categoria)
     }

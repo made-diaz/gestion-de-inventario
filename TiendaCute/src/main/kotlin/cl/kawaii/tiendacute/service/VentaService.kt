@@ -13,10 +13,18 @@ import cl.kawaii.tiendacute.repository.ProductoRepository
 import cl.kawaii.tiendacute.repository.UsuarioRepository
 import cl.kawaii.tiendacute.repository.VentaRepository
 import cl.kawaii.tiendacute.service.CajaService
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.criteria.CriteriaBuilder
+import jakarta.persistence.criteria.CriteriaQuery
+import jakarta.persistence.criteria.Predicate
+import jakarta.persistence.criteria.Root
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.LocalDateTime
 
 @Service
 class VentaService(
@@ -29,19 +37,49 @@ class VentaService(
     private val cajaService: CajaService
 ) {
 
-    fun listarVentas(): List<Venta> = ventaRepository.findAll()
+    /**
+     * Lista ventas con paginación y filtros opcionales.
+     *
+     * Filtros:
+     *   - desde: fechaVenta >= desde
+     *   - hasta: fechaVenta <= hasta
+     *   - idCliente: filtra por cliente exacto
+     *   - idUsuario: filtra por usuario exacto
+     *   Orden: fecha desc
+     */
+    @Transactional(readOnly = true)
+    fun listarVentas(
+        pageable: Pageable?,
+        desde: LocalDateTime?,
+        hasta: LocalDateTime?,
+        idCliente: Long?,
+        idUsuario: Long?
+    ): Page<Venta> {
+        val spec: Specification<Venta> = Specification { root: Root<Venta>, query: CriteriaQuery<*>, cb: CriteriaBuilder ->
+            val predicates = mutableListOf<Predicate>()
+            if (desde != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get<LocalDateTime>("fechaVenta"), desde))
+            }
+            if (hasta != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get<LocalDateTime>("fechaVenta"), hasta))
+            }
+            if (idCliente != null) {
+                predicates.add(cb.equal(root.get<Long>("cliente_id"), idCliente))
+            }
+            if (idUsuario != null) {
+                predicates.add(cb.equal(root.get<Long>("usuario_id"), idUsuario))
+            }
+            query.orderBy(cb.desc(root.get<LocalDateTime>("fechaVenta")))
+            cb.and(*predicates.toTypedArray())
+        }
+        return ventaRepository.findAll(spec, pageable ?: Pageable.unpaged())
+    }
 
+    @Transactional(readOnly = true)
     fun buscarPorId(id: Long): Venta = ventaRepository.findById(id)
         .orElseThrow { RecursoNoEncontradoException("Venta no encontrada con id $id") }
 
-    /**
-     * Registra una venta completa en una sola transacción:
-     * valida stock, descuenta inventario, deja el movimiento de stock
-     * y calcula neto, IVA y total en el servidor.
-     *
-     * Los precios salen siempre del catálogo, nunca del payload.
-     * Si algo falla, no se descuenta nada: la transacción se revierte entera.
-     */
+    /** ... */
     @Transactional
     fun registrarVenta(request: VentaRequest): Venta {
         if (request.detalles.isEmpty()) {
@@ -64,7 +102,6 @@ class VentaService(
                 .orElseThrow { RecursoNoEncontradoException("Cliente no encontrado con RUT: $rut") }
         }
 
-        // Si el mismo producto viene repetido, se suma la cantidad antes de validar stock.
         val cantidadesPorProducto = request.detalles
             .groupBy({ it.productoId }, { it.cantidad })
             .mapValues { (_, cantidades) -> cantidades.sum() }
@@ -132,7 +169,6 @@ class VentaService(
             detalleVentaRepository.save(detalle)
         }
 
-        // Movimiento de caja automático si hay caja abierta.
         cajaService.registrarIngresoCaja(
             monto = ventaGuardada.total,
             concepto = "Venta #${ventaGuardada.idVenta}",

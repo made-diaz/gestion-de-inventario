@@ -6,13 +6,21 @@ import cl.kawaii.tiendacute.exception.OperacionNoPermitidaException
 import cl.kawaii.tiendacute.exception.RecursoNoEncontradoException
 import cl.kawaii.tiendacute.exception.ReglaNegocioException
 import cl.kawaii.tiendacute.model.Usuario
+import cl.kawaii.tiendacute.repository.CajaRepository
+import cl.kawaii.tiendacute.repository.CategoriaRepository
+import cl.kawaii.tiendacute.repository.DetalleVentaRepository
+import cl.kawaii.tiendacute.repository.DocumentoTributarioRepository
+import cl.kawaii.tiendacute.repository.MovimientoStockRepository
+import cl.kawaii.tiendacute.repository.PagoRepository
+import cl.kawaii.tiendacute.repository.ProductoRepository
 import cl.kawaii.tiendacute.repository.UsuarioRepository
+import cl.kawaii.tiendacute.repository.VentaRepository
 import cl.kawaii.tiendacute.service.UsuarioService
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.transaction.annotation.Transactional
-import org.junit.jupiter.api.BeforeEach
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
@@ -28,8 +36,41 @@ class UsuarioActualizarServiceTest {
     @Autowired
     private lateinit var usuarioRepository: UsuarioRepository
 
+    @Autowired
+    private lateinit var ventaRepository: VentaRepository
+
+    @Autowired
+    private lateinit var pagoRepository: PagoRepository
+
+    @Autowired
+    private lateinit var detalleVentaRepository: DetalleVentaRepository
+
+    @Autowired
+    private lateinit var documentoTributarioRepository: DocumentoTributarioRepository
+
+    @Autowired
+    private lateinit var movimientoStockRepository: MovimientoStockRepository
+
+    @Autowired
+    private lateinit var productoRepository: ProductoRepository
+
+    @Autowired
+    private lateinit var categoriaRepository: CategoriaRepository
+
+    @Autowired
+    private lateinit var cajaRepository: CajaRepository
+
     @BeforeEach
-    fun limpiarUsuarios() {
+    fun limpiarTodo() {
+        // Borrar en orden de dependencias de clave foránea para evitar violaciones.
+        detalleVentaRepository.deleteAll()
+        pagoRepository.deleteAll()
+        documentoTributarioRepository.deleteAll()
+        ventaRepository.deleteAll()
+        movimientoStockRepository.deleteAll()
+        productoRepository.deleteAll()
+        categoriaRepository.deleteAll()
+        cajaRepository.deleteAll()
         usuarioRepository.deleteAll()
     }
 

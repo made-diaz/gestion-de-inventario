@@ -3,6 +3,8 @@ package cl.kawaii.tiendacute.controller
 import cl.kawaii.tiendacute.dto.ProductoActualizarRequest
 import cl.kawaii.tiendacute.model.Producto
 import cl.kawaii.tiendacute.service.ProductoService
+import org.springframework.data.domain.PageRequest
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -12,7 +14,20 @@ import org.springframework.web.bind.annotation.*
 class ProductoController(private val productoService: ProductoService) {
 
     @GetMapping
-    fun listarProductos(): List<Producto> = productoService.listarProductos()
+    fun listarProductos(
+        @RequestParam(required = false) page: Int?,
+        @RequestParam(required = false) size: Int?,
+        @RequestParam(required = false) q: String?,
+        @RequestParam(required = false) idCategoria: Long?,
+        response: jakarta.servlet.http.HttpServletResponse
+    ): ResponseEntity<List<Producto>> {
+        val pageable = if (page != null && size != null) PageRequest.of(page, size) else null
+        val pagina = productoService.listarProductos(pageable, q, idCategoria)
+        if (pageable != null) {
+            response.setHeader("X-Total-Count", pagina.totalElements.toString())
+        }
+        return ResponseEntity.ok(pagina.content)
+    }
 
     @GetMapping("/{id}")
     fun buscarPorId(@PathVariable id: Long): ResponseEntity<Producto> =
