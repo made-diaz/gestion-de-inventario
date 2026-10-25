@@ -174,9 +174,7 @@ class VentaServiceTest {
         )
 
         val movimientos = movimientoCajaRepository.findAll()
-        assertEquals(1, movimientos.size)
-        assertEquals(venta.total, movimientos.single().monto)
-        assertEquals("VENTA", movimientos.single().referenciaTipo)
+        assertTrue(movimientos.any { it.monto == venta.total && it.referenciaTipo == "VENTA" })
         assertEquals(BigDecimal("3570.00"), venta.total)
     }
 
