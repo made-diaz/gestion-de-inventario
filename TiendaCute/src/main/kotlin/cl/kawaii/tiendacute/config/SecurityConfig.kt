@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.AuthenticationManager
@@ -30,8 +31,28 @@ class SecurityConfig(
             // Sin sesión: cada request se autentica con su propio token.
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
-                it.requestMatchers("/api/auth/login").permitAll()
-                it.anyRequest().authenticated()
+                it.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                // El despacho de errores del contenedor no debe convertirse en 403.
+                it.requestMatchers("/error").permitAll()
+
+                // Catálogo y consultas: los dos roles.
+                it.requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/categorias/**", "/api/clientes/**")
+                    .hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
+                it.requestMatchers(
+                    HttpMethod.GET,
+                    "/api/pagos/**",
+                    "/api/documentos-tributarios/**",
+                    "/api/movimientos-stock/**"
+                ).hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
+
+                // Operación de mostrador: vender, cobrar y registrar clientes.
+                it.requestMatchers(HttpMethod.POST, "/api/ventas").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
+                it.requestMatchers(HttpMethod.POST, "/api/pagos").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
+                it.requestMatchers(HttpMethod.POST, "/api/clientes").hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
+
+                // Administración: usuarios y todo lo que modifica el catálogo.
+                it.requestMatchers("/api/usuarios/**").hasRole(ROL_ADMIN)
+                it.anyRequest().hasRole(ROL_ADMIN)
             }
             .exceptionHandling {
                 it.authenticationEntryPoint { _, response, _ ->
@@ -62,5 +83,11 @@ class SecurityConfig(
         response.contentType = MediaType.APPLICATION_JSON_VALUE
         response.characterEncoding = "UTF-8"
         objectMapper.writeValue(response.writer, ErrorResponse(estado.value(), mensaje))
+    }
+
+    private companion object {
+        // hasRole() agrega el prefijo ROLE_, así que acá van sin prefijo.
+        const val ROL_ADMIN = "ADMIN"
+        const val ROL_VENDEDOR = "VENDEDOR"
     }
 }

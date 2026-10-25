@@ -19,7 +19,7 @@ import java.math.BigDecimal
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@WithMockUser
+@WithMockUser(roles = ["ADMIN"])
 class ProductoSerializacionTest {
 
     @Autowired

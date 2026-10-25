@@ -60,7 +60,10 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException::class)
     fun manejarConflictoDeDatos(ex: DataIntegrityViolationException): ResponseEntity<ErrorResponse> =
-        construir(HttpStatus.CONFLICT, "La operación viola una restricción de la base de datos")
+        construir(
+            HttpStatus.CONFLICT,
+            "No se puede completar: el registro tiene datos asociados o repite un valor único"
+        )
 
     private fun construir(estado: HttpStatus, mensaje: String?): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(estado).body(ErrorResponse(estado.value(), mensaje ?: estado.reasonPhrase))
