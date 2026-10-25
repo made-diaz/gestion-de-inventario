@@ -1,5 +1,6 @@
 package cl.kawaii.tiendacute.controller
 
+import cl.kawaii.tiendacute.dto.ClienteActualizarRequest
 import cl.kawaii.tiendacute.model.Cliente
 import cl.kawaii.tiendacute.service.ClienteService
 import org.springframework.http.HttpStatus
@@ -20,6 +21,13 @@ class ClienteController(private val clienteService: ClienteService) {
     @PostMapping
     fun crearCliente(@RequestBody cliente: Cliente): ResponseEntity<Cliente> =
         ResponseEntity.status(HttpStatus.CREATED).body(clienteService.guardarCliente(cliente))
+
+    @PutMapping("/{id}")
+    fun actualizarCliente(
+        @PathVariable id: Long,
+        @RequestBody request: ClienteActualizarRequest
+    ): ResponseEntity<Cliente> =
+        ResponseEntity.ok(clienteService.actualizarCliente(id, request))
 
     @DeleteMapping("/{id}")
     fun eliminarCliente(@PathVariable id: Long): ResponseEntity<Void> {

@@ -1,5 +1,6 @@
 package cl.kawaii.tiendacute.controller
 
+import cl.kawaii.tiendacute.dto.CategoriaActualizarRequest
 import cl.kawaii.tiendacute.model.Categoria
 import cl.kawaii.tiendacute.service.CategoriaService
 import org.springframework.http.HttpStatus
@@ -20,6 +21,13 @@ class CategoriaController(private val categoriaService: CategoriaService) {
     @PostMapping
     fun crearCategoria(@RequestBody categoria: Categoria): ResponseEntity<Categoria> =
         ResponseEntity.status(HttpStatus.CREATED).body(categoriaService.guardarCategoria(categoria))
+
+    @PutMapping("/{id}")
+    fun actualizarCategoria(
+        @PathVariable id: Long,
+        @RequestBody request: CategoriaActualizarRequest
+    ): ResponseEntity<Categoria> =
+        ResponseEntity.ok(categoriaService.actualizarCategoria(id, request))
 
     @DeleteMapping("/{id}")
     fun eliminarCategoria(@PathVariable id: Long): ResponseEntity<Void> {
