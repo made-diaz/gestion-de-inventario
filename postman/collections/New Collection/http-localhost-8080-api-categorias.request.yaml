@@ -1,0 +1,6 @@
+$kind: http-request
+name: http://localhost:8080/api/categorias
+description: ""
+url: http://localhost:8080/api/categorias
+method: GET
+order: 1785215369369
