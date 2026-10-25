@@ -79,6 +79,13 @@ class AutorizacionRolesTest {
     }
 
     @Test
+    fun `un vendedor puede listar ventas`() {
+        mockMvc.get("/api/ventas") {
+            header("Authorization", "Bearer $tokenVendedor")
+        }.andExpect { status { isOk() } }
+    }
+
+    @Test
     fun `un vendedor no puede listar usuarios`() {
         mockMvc.get("/api/usuarios") {
             header("Authorization", "Bearer $tokenVendedor")

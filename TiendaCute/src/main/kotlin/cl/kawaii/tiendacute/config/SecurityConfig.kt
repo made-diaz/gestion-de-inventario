@@ -42,7 +42,8 @@ class SecurityConfig(
                     HttpMethod.GET,
                     "/api/pagos/**",
                     "/api/documentos-tributarios/**",
-                    "/api/movimientos-stock/**"
+                    "/api/movimientos-stock/**",
+                    "/api/ventas/**"
                 ).hasAnyRole(ROL_ADMIN, ROL_VENDEDOR)
 
                 // Operación de mostrador: vender, cobrar y registrar clientes.

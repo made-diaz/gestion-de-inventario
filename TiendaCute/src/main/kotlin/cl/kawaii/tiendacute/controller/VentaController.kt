@@ -11,6 +11,13 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/ventas")
 class VentaController(private val ventaService: VentaService) {
 
+    @GetMapping
+    fun listarVentas(): List<Venta> = ventaService.listarVentas()
+
+    @GetMapping("/{id}")
+    fun buscarPorId(@PathVariable id: Long): ResponseEntity<Venta> =
+        ResponseEntity.ok(ventaService.buscarPorId(id))
+
     @PostMapping
     fun registrarVenta(@RequestBody request: VentaRequest): ResponseEntity<Venta> {
         val ventaRegistrada = ventaService.registrarVenta(request)

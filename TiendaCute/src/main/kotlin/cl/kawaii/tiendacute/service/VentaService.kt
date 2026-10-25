@@ -27,6 +27,11 @@ class VentaService(
     private val clienteRepository: ClienteRepository
 ) {
 
+    fun listarVentas(): List<Venta> = ventaRepository.findAll()
+
+    fun buscarPorId(id: Long): Venta = ventaRepository.findById(id)
+        .orElseThrow { RecursoNoEncontradoException("Venta no encontrada con id $id") }
+
     /**
      * Registra una venta completa en una sola transacción:
      * valida stock, descuenta inventario, deja el movimiento de stock
