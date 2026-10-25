@@ -45,7 +45,7 @@ class JwtService(
 
     fun esValido(token: String, usuario: String): Boolean = try {
         val claims = leerClaims(token)
-        claims.subject == usuario && claims.expiration.after(Date())
+        claims.subject == usuario && claims.expiration?.after(Date()) == true
     } catch (e: JwtException) {
         false
     } catch (e: IllegalArgumentException) {

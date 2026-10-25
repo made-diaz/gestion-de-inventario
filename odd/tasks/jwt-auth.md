@@ -12,6 +12,7 @@ Rama: `feat/jwt-auth`. Runner: `.\gradlew.bat test`.
 - **S5.** `usuario` y `password` vacíos devuelven `400` (usa `spring-boot-starter-validation`, que estaba sin usar).
 - **S6.** La contraseña se verifica con BCrypt contra el hash ya almacenado; nunca se compara en texto plano.
 - **S7.** Si la tabla de usuarios está vacía, al arrancar se crea un usuario ADMIN a partir de `ADMIN_USER` / `ADMIN_PASSWORD`. Sin esas variables no se crea nada y queda un aviso en el log: no existe contraseña por defecto en el código.
+- **S8.** Un token emitido antes de deshabilitar una cuenta deja de servir: el filtro vuelve a consultar el estado del usuario en cada request y responde `401`. Un token sin claim `exp`, expirado, firmado con otra clave o de un usuario eliminado también devuelve `401`.
 
 ## Tasks
 
@@ -21,9 +22,11 @@ Rama: `feat/jwt-auth`. Runner: `.\gradlew.bat test`.
 - **T4.** Manejadores de error de autenticación en `GlobalExceptionHandler`. (S2)
 - **T5.** Tests de login, credenciales inválidas, endpoint protegido con y sin token. (S1-S3)
 - **T6.** `UsuarioInicialInitializer` para poder autenticarse en una base vacía. (S7)
+- **T7.** Verificación de estado de cuenta y de `exp` en el filtro, con tests de rechazo. (S8)
 
 ## Log
 
 - **L1.** Usuario: "ya continuamos con lo que falta+" — continuación del roadmap acordado, que arranca por autenticación.
 - **L2.** Decisión: sesiones stateless, sin refresh token por ahora. El token vive 2 horas y se vuelve a pedir con login.
 - **L3.** Detección durante la implementación: al exigir token en todos los endpoints, una base vacía quedaba inutilizable (no había forma de crear el primer usuario). Se agregó el usuario inicial por variables de entorno.
+- **L4.** Verificación independiente sobre `b6d905d` encontró que un token seguía siendo válido después de deshabilitar la cuenta (hasta 2 horas), un `NullPointerException` con tokens sin claim `exp`, y placeholders del `.example` que parecían secretos reales. Se corrigió todo y se agregaron 5 tests de rechazo (`JwtRechazoTest`).

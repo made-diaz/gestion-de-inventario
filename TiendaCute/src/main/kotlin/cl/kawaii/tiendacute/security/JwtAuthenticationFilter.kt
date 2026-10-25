@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.stereotype.Component
@@ -35,13 +36,17 @@ class JwtAuthenticationFilter(
 
                 if (jwtService.esValido(token, nombreUsuario)) {
                     val userDetails = usuarioDetailsService.loadUserByUsername(nombreUsuario)
-                    val autenticacion = UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.authorities
-                    )
-                    autenticacion.details = WebAuthenticationDetailsSource().buildDetails(request)
-                    SecurityContextHolder.getContext().authentication = autenticacion
+
+                    // La cuenta pudo deshabilitarse después de emitir el token.
+                    if (cuentaHabilitada(userDetails)) {
+                        val autenticacion = UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.authorities
+                        )
+                        autenticacion.details = WebAuthenticationDetailsSource().buildDetails(request)
+                        SecurityContextHolder.getContext().authentication = autenticacion
+                    }
                 }
             } catch (e: JwtException) {
                 // Token inválido o expirado: se continúa sin autenticar.
@@ -52,6 +57,12 @@ class JwtAuthenticationFilter(
 
         filterChain.doFilter(request, response)
     }
+
+    private fun cuentaHabilitada(userDetails: UserDetails): Boolean =
+        userDetails.isEnabled &&
+            userDetails.isAccountNonLocked &&
+            userDetails.isAccountNonExpired &&
+            userDetails.isCredentialsNonExpired
 
     private fun leerToken(request: HttpServletRequest): String? {
         val header = request.getHeader("Authorization") ?: return null
