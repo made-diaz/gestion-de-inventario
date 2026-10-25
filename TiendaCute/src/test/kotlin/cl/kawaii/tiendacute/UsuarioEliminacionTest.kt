@@ -1,6 +1,6 @@
 package cl.kawaii.tiendacute
 
-import cl.kawaii.tiendacute.exception.ReglaNegocioException
+import cl.kawaii.tiendacute.exception.OperacionNoPermitidaException
 import cl.kawaii.tiendacute.model.Usuario
 import cl.kawaii.tiendacute.repository.UsuarioRepository
 import cl.kawaii.tiendacute.service.UsuarioService
@@ -11,6 +11,9 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.TransactionStatus
 import java.util.Optional
 import kotlin.test.assertFailsWith
 
@@ -22,7 +25,15 @@ class UsuarioEliminacionTest {
 
     private val repositorio = mock(UsuarioRepository::class.java)
     private val encoder = mock(PasswordEncoder::class.java)
-    private val servicio = UsuarioService(repositorio, encoder)
+    private val gestor = mock(PlatformTransactionManager::class.java)
+
+    private val servicio: UsuarioService
+
+    init {
+        `when`(gestor.getTransaction(any(TransactionDefinition::class.java)))
+            .thenReturn(mock(TransactionStatus::class.java))
+        servicio = UsuarioService(repositorio, encoder, gestor)
+    }
 
     @Test
     fun `no elimina el ultimo administrador activo`() {
@@ -30,7 +41,7 @@ class UsuarioEliminacionTest {
         `when`(repositorio.findById(1L)).thenReturn(Optional.of(admin))
         `when`(repositorio.countByRolUsuarioAndActivoUsuario("ADMIN", true)).thenReturn(1L)
 
-        assertFailsWith<ReglaNegocioException> { servicio.eliminarUsuario(1L) }
+        assertFailsWith<OperacionNoPermitidaException> { servicio.eliminarUsuario(1L) }
         verify(repositorio, never()).delete(any(Usuario::class.java))
     }
 
@@ -70,6 +81,15 @@ class UsuarioEliminacionTest {
         servicio.eliminarUsuario(3L)
 
         verify(repositorio).delete(adminInactivo)
+    }
+
+    @Test
+    fun `borrar un id inexistente no hace nada`() {
+        `when`(repositorio.findById(99L)).thenReturn(Optional.empty())
+
+        servicio.eliminarUsuario(99L)
+
+        verify(repositorio, never()).delete(any(Usuario::class.java))
     }
 
     private fun admin(id: Long) = Usuario(

@@ -29,6 +29,10 @@ class GlobalExceptionHandler {
     fun manejarReglaDeNegocio(ex: ReglaNegocioException): ResponseEntity<ErrorResponse> =
         construir(HttpStatus.BAD_REQUEST, ex.message)
 
+    @ExceptionHandler(OperacionNoPermitidaException::class)
+    fun manejarOperacionNoPermitida(ex: OperacionNoPermitidaException): ResponseEntity<ErrorResponse> =
+        construir(HttpStatus.CONFLICT, ex.message)
+
     @ExceptionHandler(BadCredentialsException::class)
     fun manejarCredencialesInvalidas(ex: BadCredentialsException): ResponseEntity<ErrorResponse> =
         construir(HttpStatus.UNAUTHORIZED, MENSAJE_CREDENCIALES)

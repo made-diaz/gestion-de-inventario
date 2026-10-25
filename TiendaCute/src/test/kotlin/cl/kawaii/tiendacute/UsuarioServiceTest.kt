@@ -1,4 +1,4 @@
-﻿package cl.kawaii.tiendacute
+package cl.kawaii.tiendacute
 
 import cl.kawaii.tiendacute.model.Usuario
 import cl.kawaii.tiendacute.repository.UsuarioRepository

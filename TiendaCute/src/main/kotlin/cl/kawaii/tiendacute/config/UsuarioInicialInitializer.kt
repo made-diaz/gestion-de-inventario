@@ -44,11 +44,13 @@ class UsuarioInicialInitializer(
         try {
             UsuarioService.validarPassword(adminUsuario, adminPassword)
         } catch (e: ReglaNegocioException) {
-            log.warn(
-                "No se creó el usuario inicial: {}. Corregí ADMIN_PASSWORD en env.properties.",
-                e.message
+            // Falla ruidosamente: si el operador definió una contraseña débil,
+            // dejar la app arriba sin ningún usuario es peor que no arrancar.
+            throw IllegalStateException(
+                "ADMIN_PASSWORD no cumple la política mínima (${e.message}). " +
+                    "Corregí env.properties antes de arrancar.",
+                e
             )
-            return
         }
 
         usuarioRepository.save(

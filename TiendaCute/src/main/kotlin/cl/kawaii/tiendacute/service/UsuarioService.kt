@@ -1,18 +1,35 @@
 package cl.kawaii.tiendacute.service
 
+import cl.kawaii.tiendacute.exception.OperacionNoPermitidaException
 import cl.kawaii.tiendacute.exception.RecursoNoEncontradoException
 import cl.kawaii.tiendacute.exception.ReglaNegocioException
 import cl.kawaii.tiendacute.model.Usuario
 import cl.kawaii.tiendacute.repository.UsuarioRepository
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 @Service
 class UsuarioService(
     private val usuarioRepository: UsuarioRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+    gestorTransacciones: PlatformTransactionManager
 ) {
+
+    /**
+     * El chequeo y el commit del borrado ocurren dentro de este lock. Si la
+     * transacción cerrara después de soltarlo, dos borrados simultáneos podrían
+     * pasar los dos el chequeo y dejar el sistema sin administrador.
+     *
+     * Es un lock de JVM: alcanza para una instancia, igual que el contador de
+     * intentos. Con varias instancias esto se resuelve en la base.
+     */
+    private val bloqueoEliminacion = ReentrantLock()
+    private val transaccion = TransactionTemplate(gestorTransacciones)
 
     @Transactional(readOnly = true)
     fun listarUsuarios(): List<Usuario> = usuarioRepository.findAll()
@@ -33,22 +50,29 @@ class UsuarioService(
     /**
      * Borra un usuario, salvo que sea el último administrador activo: si se
      * fuera, nadie podría volver a administrar el sistema.
+     *
+     * Borrar un id inexistente sigue siendo un no-op (204), como antes.
      */
-    @Transactional
     fun eliminarUsuario(id: Long) {
-        val usuario = buscarPorId(id)
+        bloqueoEliminacion.withLock {
+            transaccion.executeWithoutResult {
+                val usuario = usuarioRepository.findById(id).orElse(null)
+                    ?: return@executeWithoutResult
 
-        val esUltimoAdminActivo = usuario.rolUsuario.equals(ROL_ADMIN, ignoreCase = true) &&
-            usuario.activoUsuario &&
-            usuarioRepository.countByRolUsuarioAndActivoUsuario(ROL_ADMIN, true) <= 1
+                val esUltimoAdminActivo =
+                    usuario.rolUsuario.equals(ROL_ADMIN, ignoreCase = true) &&
+                        usuario.activoUsuario &&
+                        usuarioRepository.countByRolUsuarioAndActivoUsuario(ROL_ADMIN, true) <= 1
 
-        if (esUltimoAdminActivo) {
-            throw ReglaNegocioException(
-                "No se puede eliminar el último administrador activo: el sistema quedaría sin acceso"
-            )
+                if (esUltimoAdminActivo) {
+                    throw OperacionNoPermitidaException(
+                        "No se puede eliminar el último administrador activo: el sistema quedaría sin acceso"
+                    )
+                }
+
+                usuarioRepository.delete(usuario)
+            }
         }
-
-        usuarioRepository.delete(usuario)
     }
 
     companion object {
