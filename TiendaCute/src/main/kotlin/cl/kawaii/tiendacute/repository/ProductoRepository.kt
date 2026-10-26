@@ -21,4 +21,20 @@ interface ProductoRepository : JpaRepository<Producto, Long>, JpaSpecificationEx
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Producto p where p.idProducto = :id")
     fun findByIdForUpdate(@Param("id") id: Long): Optional<Producto>
+
+    /**
+     * Productos con stock bajo o igual al umbral, ordenados por stock ascendente,
+     * máximo 10. Devuelve Array<Any>[0]=id, [1]=nombre, [2]=código, [3]=stock.
+     */
+    @Query(
+        value = """
+            select id_producto, nombre_producto, codigo_producto, stock_actual_producto
+            from productos
+            where stock_actual_producto <= :umbral
+            order by stock_actual_producto asc
+            limit 10
+        """,
+        nativeQuery = true
+    )
+    fun obtenerProductosStockBajo(@Param("umbral") umbral: Int): List<Array<Any>>
 }

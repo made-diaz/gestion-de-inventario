@@ -57,4 +57,40 @@ interface VentaRepository : JpaRepository<Venta, Long>, JpaSpecificationExecutor
         @Param("idUsuario") idUsuario: Long?,
         pageable: Pageable
     ): Page<Array<Any>>
+
+    /**
+     * Suma de totales y cantidad de ventas en un rango de fechas (para reporte del día).
+     * Devuelve Array<Any>[0]=suma (BigDecimal o null), [1]=count (Long).
+     */
+    @Query(
+        value = """
+            select coalesce(sum(v.total), 0), count(*)
+            from ventas v
+            where v.fecha_venta >= :inicio and v.fecha_venta < :fin
+        """,
+        nativeQuery = true
+    )
+    fun obtenerResumenDia(
+        @Param("inicio") inicio: LocalDateTime,
+        @Param("fin") fin: LocalDateTime
+    ): List<Array<Any>>
+
+    /**
+     * Ventas agrupadas por día en un rango (para reporte de últimos 7 días).
+     * Devuelve Array<Any>[0]=fecha (LocalDate), [1]=total (BigDecimal), [2]=cantidad (Long).
+     */
+    @Query(
+        value = """
+            select CAST(v.fecha_venta AS DATE), sum(v.total), count(*)
+            from ventas v
+            where v.fecha_venta >= :inicio and v.fecha_venta < :fin
+            group by CAST(v.fecha_venta AS DATE)
+            order by CAST(v.fecha_venta AS DATE)
+        """,
+        nativeQuery = true
+    )
+    fun obtenerVentasPorDia(
+        @Param("inicio") inicio: LocalDateTime,
+        @Param("fin") fin: LocalDateTime
+    ): List<Array<Any>>
 }

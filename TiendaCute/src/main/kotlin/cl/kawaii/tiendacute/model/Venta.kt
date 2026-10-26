@@ -12,7 +12,7 @@ class Venta(
     @Column(name = "id_venta")
     var idVenta: Long = 0,
 
-    @Column(name = "fecha_venta", insertable = false, updatable = false)
+    @Column(name = "fecha_venta")
     var fechaVenta: LocalDateTime? = null,
 
     @Column(name = "total_neto", nullable = false, precision = 10, scale = 2)

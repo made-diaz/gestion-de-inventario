@@ -59,9 +59,11 @@ class VentaService(
     ): Page<VentaListDto> {
         return ventaRepository.listarVentasDto(desde, hasta, idCliente, idUsuario, pageable ?: Pageable.unpaged())
             .map { row ->
+                val fechaRaw = row[1]
+                val fechaVenta = if (fechaRaw == null) null else (fechaRaw as java.sql.Timestamp).toLocalDateTime()
                 VentaListDto(
                     idVenta = row[0] as Long,
-                    fechaVenta = row[1] as LocalDateTime?,
+                    fechaVenta = fechaVenta,
                     tipoDocumento = row[2] as String,
                     total = row[3] as BigDecimal,
                     cantidadLineas = row[4] as Long,
@@ -143,6 +145,7 @@ class VentaService(
         val venta = Venta(
             tipoDocumento = request.venta.tipoDocumento,
             estadoVenta = request.venta.estadoVenta,
+            fechaVenta = LocalDateTime.now(),
             usuario = usuario
         )
 
