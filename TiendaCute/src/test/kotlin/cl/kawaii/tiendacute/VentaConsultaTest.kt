@@ -73,8 +73,14 @@ class VentaConsultaTest {
         val cuerpo = mockMvc.get("/api/ventas") {
             header("Authorization", "Bearer $token")
         }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        println("CUERPO_LISTAR_VENTAS: $cuerpo")
 
-        val ids = objectMapper.readTree(cuerpo).map { it.get("idVenta").asLong() }
+        val nodo = objectMapper.readTree(cuerpo)
+        val ids = if (nodo.isArray) {
+            nodo.map { it.get("idVenta").asLong() }
+        } else {
+            nodo.get("content").map { it.get("idVenta").asLong() }
+        }
         assertTrue(ids.contains(ventaId), "El listado debía incluir la venta $ventaId, contenía $ids")
     }
 
@@ -136,6 +142,8 @@ class VentaConsultaTest {
             """.trimIndent()
         }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
 
-        return objectMapper.readTree(cuerpo).get("idVenta").asLong()
+        val ventaId = objectMapper.readTree(cuerpo).get("idVenta").asLong()
+        println("VENTA_ID_CREADO: $ventaId")
+        return ventaId
     }
 }

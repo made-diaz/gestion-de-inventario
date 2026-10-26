@@ -1,27 +1,33 @@
 package cl.kawaii.tiendacute.service
 
+import cl.kawaii.tiendacute.dto.CajeroDto
+import cl.kawaii.tiendacute.dto.ClienteDto
+import cl.kawaii.tiendacute.dto.DocumentoDto
+import cl.kawaii.tiendacute.dto.LineaVentaDto
+import cl.kawaii.tiendacute.dto.PagoDto
+import cl.kawaii.tiendacute.dto.PagoVentaRequest
+import cl.kawaii.tiendacute.dto.VentaDetalleDto
+import cl.kawaii.tiendacute.dto.VentaListDto
 import cl.kawaii.tiendacute.dto.VentaRequest
 import cl.kawaii.tiendacute.exception.RecursoNoEncontradoException
 import cl.kawaii.tiendacute.exception.ReglaNegocioException
 import cl.kawaii.tiendacute.model.DetalleVenta
 import cl.kawaii.tiendacute.model.MovimientoStock
+import cl.kawaii.tiendacute.model.Pago
 import cl.kawaii.tiendacute.model.Venta
 import cl.kawaii.tiendacute.repository.ClienteRepository
 import cl.kawaii.tiendacute.repository.DetalleVentaRepository
+import cl.kawaii.tiendacute.repository.DocumentoTributarioRepository
 import cl.kawaii.tiendacute.repository.MovimientoStockRepository
+import cl.kawaii.tiendacute.repository.PagoRepository
 import cl.kawaii.tiendacute.repository.ProductoRepository
 import cl.kawaii.tiendacute.repository.UsuarioRepository
 import cl.kawaii.tiendacute.repository.VentaRepository
 import cl.kawaii.tiendacute.service.CajaService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
-import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import jakarta.persistence.criteria.CriteriaBuilder
-import jakarta.persistence.criteria.CriteriaQuery
-import jakarta.persistence.criteria.Predicate
-import jakarta.persistence.criteria.Root
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
@@ -34,18 +40,14 @@ class VentaService(
     private val movimientoStockRepository: MovimientoStockRepository,
     private val usuarioRepository: UsuarioRepository,
     private val clienteRepository: ClienteRepository,
+    private val pagoRepository: PagoRepository,
+    private val documentoTributarioRepository: DocumentoTributarioRepository,
     private val cajaService: CajaService
 ) {
 
     /**
-     * Lista ventas con paginación y filtros opcionales.
-     *
-     * Filtros:
-     *   - desde: fechaVenta >= desde
-     *   - hasta: fechaVenta <= hasta
-     *   - idCliente: filtra por cliente exacto
-     *   - idUsuario: filtra por usuario exacto
-     *   Orden: fecha desc
+     * Listado liviano de ventas con paginación y filtros opcionales.
+     * Proyección directa a DTO: sin N+1.
      */
     @Transactional(readOnly = true)
     fun listarVentas(
@@ -54,32 +56,79 @@ class VentaService(
         hasta: LocalDateTime?,
         idCliente: Long?,
         idUsuario: Long?
-    ): Page<Venta> {
-        val spec: Specification<Venta> = Specification { root: Root<Venta>, query: CriteriaQuery<*>, cb: CriteriaBuilder ->
-            val predicates = mutableListOf<Predicate>()
-            if (desde != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get<LocalDateTime>("fechaVenta"), desde))
+    ): Page<VentaListDto> {
+        return ventaRepository.listarVentasDto(desde, hasta, idCliente, idUsuario, pageable ?: Pageable.unpaged())
+            .map { row ->
+                VentaListDto(
+                    idVenta = row[0] as Long,
+                    fechaVenta = row[1] as LocalDateTime?,
+                    tipoDocumento = row[2] as String,
+                    total = row[3] as BigDecimal,
+                    cantidadLineas = row[4] as Long,
+                    clienteNombre = row[5] as String?,
+                    usuarioNombre = row[6] as String
+                )
             }
-            if (hasta != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get<LocalDateTime>("fechaVenta"), hasta))
-            }
-            if (idCliente != null) {
-                predicates.add(cb.equal(root.get<Long>("cliente_id"), idCliente))
-            }
-            if (idUsuario != null) {
-                predicates.add(cb.equal(root.get<Long>("usuario_id"), idUsuario))
-            }
-            query.orderBy(cb.desc(root.get<LocalDateTime>("fechaVenta")))
-            cb.and(*predicates.toTypedArray())
-        }
-        return ventaRepository.findAll(spec, pageable ?: Pageable.unpaged())
     }
 
+    /**
+     * Detalle completo de una venta con líneas, pagos, cajero, cliente y
+     * documento tributario. Los detalles y pagos se cargan por consultas
+     * separadas porque Venta no declara propiedades @OneToMany.
+     */
     @Transactional(readOnly = true)
-    fun buscarPorId(id: Long): Venta = ventaRepository.findById(id)
-        .orElseThrow { RecursoNoEncontradoException("Venta no encontrada con id $id") }
+    fun buscarDetalle(id: Long): VentaDetalleDto {
+        val venta = ventaRepository.findVentaConDetalles(id)
+            .orElseThrow { RecursoNoEncontradoException("Venta no encontrada con id $id") }
 
-    /** ... */
+        val detalles = detalleVentaRepository.findByVenta_IdVenta(id)
+        val pagos = pagoRepository.findByVenta_IdVenta(id)
+        val documento = documentoTributarioRepository.findByVenta_IdVenta(id)
+
+        return VentaDetalleDto(
+            idVenta = venta.idVenta,
+            fechaVenta = venta.fechaVenta,
+            tipoDocumento = venta.tipoDocumento,
+            estadoVenta = venta.estadoVenta,
+            totalNeto = venta.totalNeto,
+            iva = venta.iva,
+            total = venta.total,
+            montoPagado = venta.montoPagado,
+            saldoPendiente = venta.saldoPendiente(),
+            cajero = CajeroDto(id = venta.usuario.idUsuario, nombre = venta.usuario.usuario),
+            cliente = venta.cliente?.let { it ->
+                ClienteDto(id = it.idCliente, nombre = it.nombre, rut = it.rutCliente)
+            },
+            documento = documento?.let { it ->
+                DocumentoDto(folio = it.folio, estadoSii = it.estadoSii)
+            },
+            pagos = pagos.map { p ->
+                PagoDto(
+                    metodoPago = p.metodoPago,
+                    montoPago = p.montoPago,
+                    referencia = p.referencia,
+                    creadoEn = p.creadoEn
+                )
+            },
+            lineas = detalles.map { d ->
+                LineaVentaDto(
+                    idProducto = d.producto.idProducto,
+                    nombreProducto = d.producto.nombreProducto,
+                    cantidad = d.cantidad,
+                    precioUnitario = d.precioUnitario,
+                    subtotal = d.subtotal
+                )
+            }
+        )
+    }
+
+    /**
+     * Registra una venta completa en una sola transacción, con pagos opcionales.
+     *
+     * Los pagos se validan contra el total del servidor: la suma de todos los
+     * pagos no puede exceder el total de la venta. Cada pago individual no
+     * puede exceder el saldo pendiente restante.
+     */
     @Transactional
     fun registrarVenta(request: VentaRequest): Venta {
         if (request.detalles.isEmpty()) {
@@ -102,6 +151,7 @@ class VentaService(
                 .orElseThrow { RecursoNoEncontradoException("Cliente no encontrado con RUT: $rut") }
         }
 
+        // Si el mismo producto viene repetido, se suma la cantidad antes de validar stock.
         val cantidadesPorProducto = request.detalles
             .groupBy({ it.productoId }, { it.cantidad })
             .mapValues { (_, cantidades) -> cantidades.sum() }
@@ -169,6 +219,12 @@ class VentaService(
             detalleVentaRepository.save(detalle)
         }
 
+        // Registrar pagos opcionales en la misma transacción, validados contra el total.
+        if (request.pagos.isNotEmpty()) {
+            registrarPagosDeVenta(ventaGuardada, request.pagos, usuario.idUsuario)
+        }
+
+        // Movimiento de caja automático si hay caja abierta (por el total de la venta).
         cajaService.registrarIngresoCaja(
             monto = ventaGuardada.total,
             concepto = "Venta #${ventaGuardada.idVenta}",
@@ -178,6 +234,48 @@ class VentaService(
         )
 
         return ventaGuardada
+    }
+
+    /**
+     * Registra los pagos de una venta, validando que no excedan el saldo pendiente.
+     * Actualiza montoPagado de la venta en la misma transacción.
+     */
+    private fun registrarPagosDeVenta(
+        venta: Venta,
+        pagos: List<PagoVentaRequest>,
+        usuarioId: Long
+    ) {
+        var saldoPendiente = venta.saldoPendiente()
+
+        pagos.forEach { pagoReq ->
+            if (pagoReq.montoPago.compareTo(saldoPendiente) > 0) {
+                throw ReglaNegocioException(
+                    "El pago de ${pagoReq.montoPago} excede el saldo pendiente de la venta #${venta.idVenta} ($saldoPendiente)"
+                )
+            }
+
+            val pago = Pago(
+                metodoPago = pagoReq.metodoPago,
+                montoPago = pagoReq.montoPago,
+                referencia = pagoReq.referencia,
+                venta = venta
+            )
+            val pagoGuardado = pagoRepository.save(pago)
+
+            venta.montoPagado = venta.montoPagado + pagoReq.montoPago
+            saldoPendiente = saldoPendiente - pagoReq.montoPago
+
+            // Movimiento de caja por el pago.
+            cajaService.registrarIngresoCaja(
+                monto = pagoReq.montoPago,
+                concepto = "Pago de venta #${venta.idVenta}",
+                referenciaTipo = "PAGO",
+                referenciaId = pagoGuardado.idPago,
+                usuarioId = usuarioId
+            )
+        }
+
+        ventaRepository.save(venta)
     }
 
     companion object {

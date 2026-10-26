@@ -10,6 +10,8 @@ interface DocumentoTributarioRepository : JpaRepository<DocumentoTributario, Lon
 
     fun existsByVenta_IdVenta(ventaId: Long): Boolean
 
+    fun findByVenta_IdVenta(ventaId: Long): DocumentoTributario?
+
     @Query(
         value = "SELECT MAX(folio) FROM documentos_tributarios WHERE tipo = ?1",
         nativeQuery = true
